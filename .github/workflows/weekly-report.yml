@@ -1,0 +1,49 @@
+# GitHub Actions 定时运行 AI 情报采集 Bot
+# 完全免费：每月 2000 分钟额度，这个任务每次约 5 分钟，完全够用
+
+name: AI News Weekly Report
+
+on:
+  schedule:
+    # 每周一早上 9:00 北京时间 (UTC+8)
+    # UTC 1:00 = 北京时间 9:00 | COLLECT_DAYS=7 一次收一周
+    - cron: '0 1 * * 1'
+  # 允许手动触发（在 GitHub 仓库 Actions 页面点 "Run workflow"）
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # 最多跑 15 分钟，防止卡死
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 安装 Playwright 浏览器（用于 Twitter 采集方案C）
+        run: |
+          playwright install chromium --with-deps
+
+      - name: 运行 AI 情报 Bot
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          TWITTER_USERNAME: ${{ secrets.TWITTER_USERNAME }}
+          TWITTER_PASSWORD: ${{ secrets.TWITTER_PASSWORD }}
+        run: python main.py
+
+      - name: 记录运行日志
+        if: always()
+        run: |
+          echo "运行时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "退出码: ${{ job.status }}"
