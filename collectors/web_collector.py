@@ -29,7 +29,7 @@ WEB_SOURCES = [
     {"name": "Stability AI Blog", "url": "https://stability.ai/news"},
     # AI 工具发现
     {"name": "GitHub Trending", "url": "https://github.com/trending?since=weekly"},
-    {"name": "Product Hunt", "url": "https://www.producthunt.com/"},
+    {"name": "GitHub Trending AI", "url": "https://github.com/trending/python?since=weekly"},
 ]
 
 

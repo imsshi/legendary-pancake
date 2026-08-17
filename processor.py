@@ -18,9 +18,35 @@ from config import (
     DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MIN_SCORE, MAX_WORKERS,
     CROSS_VALIDATION_SIMILARITY, CROSS_VALIDATION_MIN_SOURCES,
     CROSS_VALIDATED_WEIGHT, CREDIBILITY_WEIGHTS, get_source_credibility,
+    domain_signal,
 )
 
 client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+
+# ============================================
+# 类目归一化 — AI 可能返回短名/错 emoji，统一映射到标准全名
+# ============================================
+def normalize_category(cat):
+    if not cat:
+        return "📌 其他"
+    if "电商" in cat:
+        return "🛒 电商平台AI动态（竞对AI功能/动作）"
+    if "行业" in cat:
+        return "🏭 行业AI应用（零售/金融/教育/医疗等）"
+    if "企业" in cat or "提效" in cat:
+        return "💼 企业AI提效（工具/自动化/赋能）"
+    # 旧类目/裸类目兜底
+    if "应用" in cat or "落地" in cat:
+        return "🏭 行业AI应用（零售/金融/教育/医疗等）"
+    if "大模型" in cat:
+        return "🧠 大模型动态（发布/更新/评测）"
+    if "工具" in cat or "产品" in cat:
+        return "🛠️ AI工具与产品（热议工具/功能更新/开源项目）"
+    if "前沿" in cat or "技术" in cat:
+        return "🔬 前沿技术（Agent/工程策略/新架构）"
+    if "洞察" in cat or "KOL" in cat:
+        return "🎙️ KOL洞察（专家观点/趋势判断）"
+    return "📌 其他"
 
 # ============================================
 # 文章处理 Prompt — v4 模块边界清晰化
@@ -32,18 +58,25 @@ ARTICLE_PROCESS_PROMPT = """你是 AI 行业情报分析师。读者是互联网
 文章标题: {title}
 文章摘要: {summary}
 来源: {source}（可信度: {credibility}）
+领域命中: {domain_hint}
 
 1. 分类（按模块边界）：
    - 🧠 大模型动态（发布/更新/评测）：新模型发布须标注核心特点；现有模型迭代须标注新增特性；评测方法与基准；视频/语音/多模态模型
    - 🛠️ AI工具与产品（热议工具/功能更新/开源项目）：不限新发布，近期热议或有功能更新的产品均可；GitHub Trending 项目；少数派等平台推荐
-   - 💼 AI应用落地（行业案例/实际部署）：垂直行业 AI 落地案例，优先有具体数据（如点击率提升X%、成本降低Y%）；企业合作/投融资类降分处理，不占主要篇幅
+   - 🛒 电商平台AI动态（竞对AI功能/动作）：淘宝/天猫、京东、拼多多、抖音、快手、小红书、Amazon、Shopify、Shein、Temu 等平台的 AI 新功能/动作；AI 导购、AI 购物助手、AI 推荐、AI 搜索等电商场景 AI 应用
+   - 🏭 行业AI应用（零售/金融/教育/医疗等）：非电商行业的 AI 落地案例，优先有具体数据（如效率提升X%、成本降低Y%）
+   - 💼 企业AI提效（工具/自动化/赋能）：企业内部 AI 工具、自动化方案、AI 对企业的赋能
    - 🔬 前沿技术（Agent/工程策略/新架构）：Agent 工程实现技术；新架构/训练方法；先白话解释策略→再展开细节；不收录纯理论论文
    - 🎙️ KOL洞察（专家观点/趋势判断）：专家对行业方向的判断；产品分析方法论；须有实质观点，纯转发/闲聊降分
    - 📌 其他
 
-2. 四维评分（各 1-5）：
-   - credibility(可信度) / freshness(时新性) / applicability(应用性) / insight(启发性)
-   combined = round(credibility×0.25 + freshness×0.15 + applicability×0.35 + insight×0.25)
+2. 五维评分（各 1-10，拉开差距，不要堆在中间值）：
+   - credibility(可信度) / freshness(时新性) / applicability(应用性) / insight(启发性) / relevance(领域相关度)
+   relevance 判定标准：对「AI产品经理、电商/导购、评测、应用落地、业务提效」的实际价值。
+     纯技术论文/大模型架构细节/纯理论 → relevance=1~3
+     有落地案例、产品方法、业务数据、可复用的工具 → relevance=7~10
+   combined = round(credibility×0.20 + freshness×0.10 + applicability×0.30 + insight×0.20 + relevance×0.20)
+   分布约束：9~10 分的只给极少数最重磅内容（约 10% 以内），4 分以下给明显低质内容，不要让大量内容堆在同一分值。
 
 3. 「核心特点」：模型类标注核心特点（如"支持视频理解"）；工具类标注核心功能（如"AI生成PPT"）；更新类标注新增了什么（如"新增Agent模式"）。20字以内。不适用写"无"。
 
@@ -56,7 +89,7 @@ ARTICLE_PROCESS_PROMPT = """你是 AI 行业情报分析师。读者是互联网
 7. 关键词 1-3 个，相关工具/项目名（空数组如无）
 
 JSON:
-{{"title_cn":"","category":"🧠 大模型动态（发布/更新/评测）","scores":{{"credibility":4,"freshness":3,"applicability":4,"insight":3}},"overall_score":7,"core_feature":"核心特点或新功能","one_liner":"大白话","explain_simple":"通俗解读","application":"应用启示","keywords":[],"related_tools":[]}}
+{{"title_cn":"","category":"🧠 大模型动态（发布/更新/评测）","scores":{{"credibility":7,"freshness":6,"applicability":8,"insight":7,"relevance":8}},"overall_score":7,"core_feature":"核心特点或新功能","one_liner":"大白话","explain_simple":"通俗解读","application":"应用启示","keywords":[],"related_tools":[]}}
 
 低质内容：overall_score≤3，explain_simple 写"低质内容"。"""
 
@@ -72,14 +105,16 @@ REPORT_PROMPT = """你是 AI 行业周报编辑。读者是互联网公司业务
 
 要求：
 
-1. 「🔥 本周必读」：5~8 条最重要的。每条含 title(标题)、explain_simple(通俗解读)、application(应用启示)、url、source。
+1. 「🔥 本周必读」：5~8 条最重要的。优先选「对产品经理和互联网行业最有影响力」的内容（竞对电商AI新动作、重大应用落地、热议工具、关键KOL趋势判断），而非纯技术研究。每条含 title(标题)、explain_simple(通俗解读)、application(应用启示)、url、source。
 
 2. 「📂 分类详情」：按以下差异化条目数：
-   - 🧠 大模型动态（发布/更新/评测）：5~8 条
-   - 🛠️ AI工具与产品（热议工具/功能更新/开源项目）：5~8 条
-   - 💼 AI应用落地（行业案例/实际部署）：3~5 条（降低占比，优先有数据案例）
-   - 🔬 前沿技术（Agent/工程策略/新架构）：3~5 条
-   - 🎙️ KOL洞察（专家观点/趋势判断）：3~5 条
+   - 🛒 电商平台AI动态（竞对AI功能/动作）：5~8 条（核心，竞对电商平台的 AI 新动作）
+   - 🛠️ AI工具与产品（热议工具/功能更新/开源项目）：5~8 条（热议工具、评测、产品经理能用上的）
+   - 🏭 行业AI应用（零售/金融/教育/医疗等）：3~5 条（非电商行业的 AI 落地案例）
+   - 🎙️ KOL洞察（专家观点/趋势判断）：3~5 条（只留关键KOL的实质观点）
+   - 💼 企业AI提效（工具/自动化/赋能）：2~3 条（企业内部 AI 提效方案）
+   - 🧠 大模型动态（发布/更新/评测）：2~3 条（只留最重大的发布/突破）
+   - 🔬 前沿技术（Agent/工程策略/新架构）：1~3 条（只留最热门且可落地的）
    每条含 title、explain_simple、application、url、source。
 
 3. 「💡 应用启示」：3~5 条对业务/工作的具体启发。每条 insight(可以做什么) + why(为什么现在值得关注)。
@@ -170,16 +205,26 @@ def cross_validate(articles):
 def _process_single_article(article, retries=3):
     tier = article.get("credibility_tier", "T4")
     cv = "已验证" if article.get("cross_validated") else "单源"
+    strong_hits, weak_hits = domain_signal(
+        article.get("title", ""), article.get("summary", "")
+    )
+    if strong_hits:
+        domain_hint = f"强相关命中: {'/'.join(strong_hits[:5])}（领域高度相关）"
+    elif weak_hits:
+        domain_hint = f"弱相关命中: {'/'.join(weak_hits[:5])}（可能偏前沿，需判断落地价值）"
+    else:
+        domain_hint = "无关键词命中（需判断是否跑题或换种表达仍相关）"
     prompt = ARTICLE_PROCESS_PROMPT.format(
         title=article.get("title", ""),
         summary=article.get("summary", ""),
         source=article.get("source_name", ""),
         credibility=f"{tier} ({cv})",
+        domain_hint=domain_hint,
     )
     defaults = {
         "title_cn": article.get("title", ""),
         "category": "📌 其他",
-        "scores": {"credibility": 3, "freshness": 3, "applicability": 3, "insight": 3},
+        "scores": {"credibility": 5, "freshness": 5, "applicability": 5, "insight": 5, "relevance": 5},
         "overall_score": 5, "core_feature": "", "one_liner": "",
         "explain_simple": article.get("summary", "")[:80], "application": "",
         "keywords": [], "related_tools": [],
@@ -194,6 +239,7 @@ def _process_single_article(article, retries=3):
             result = json.loads(response.choices[0].message.content)
             for k in ["title_cn", "category", "core_feature", "one_liner", "explain_simple", "application"]:
                 article[k] = result.get(k, defaults[k])
+            article["category"] = normalize_category(article["category"])
             article["scores"] = result.get("scores", defaults["scores"])
             article["overall_score"] = int(result.get("overall_score", defaults["overall_score"]))
             article["keywords"] = result.get("keywords", defaults["keywords"])
@@ -232,7 +278,7 @@ def process_articles(articles):
                 processed.append(future.result())
             except Exception as e:
                 a = articles[idx]
-                for k, v in {"title_cn": a.get("title",""), "category": "📌 其他", "overall_score": 5, "core_feature": "", "one_liner": "", "explain_simple": "", "application": "", "keywords": [], "related_tools": [], "scores": {"credibility":3,"freshness":3,"applicability":3,"insight":3}}.items():
+                for k, v in {"title_cn": a.get("title",""), "category": "📌 其他", "overall_score": 5, "core_feature": "", "one_liner": "", "explain_simple": "", "application": "", "keywords": [], "related_tools": [], "scores": {"credibility":5,"freshness":5,"applicability":5,"insight":5,"relevance":5}}.items():
                     a[k] = v
                 processed.append(a)
             if len(processed) % 10 == 0 or len(processed) == total:
@@ -267,7 +313,7 @@ def generate_report(articles, total_before_filter=0):
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "system", "content": "你是AI周报编辑。返回合法JSON。"}, {"role": "user", "content": prompt}],
-                temperature=0.5, response_format={"type": "json_object"}, max_tokens=6000,
+                temperature=0.5, response_format={"type": "json_object"}, max_tokens=12000,
             )
             report = json.loads(response.choices[0].message.content)
             report["stats"]["total_collected"] = total_before_filter

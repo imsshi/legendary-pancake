@@ -24,3 +24,5 @@ Thumbs.db
 # Playwright
 playwright-report/
 test-results/
+# 运行时数据库（自动生成）
+articles.db

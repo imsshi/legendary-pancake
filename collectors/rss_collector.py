@@ -24,41 +24,36 @@ SOURCES = [
 
     # ===== 海外 AI 官方博客 (T1) =====
     {"name": "OpenAI Blog", "url": "https://openai.com/blog/rss.xml"},
-    {"name": "Google AI Blog", "url": "https://blog.research.google/feeds/posts/default?alt=rss"},
     {"name": "DeepMind Blog", "url": "https://deepmind.google/blog/rss.xml"},
     {"name": "Hugging Face Blog", "url": "https://huggingface.co/blog/feed.xml"},
     {"name": "NVIDIA AI Blog", "url": "https://blogs.nvidia.com/feed/"},
-    {"name": "BAIR Blog", "url": "https://bair.berkeley.edu/blog/feed.xml"},
 
     # ===== 海外 AI 媒体 (T2) =====
     {"name": "The Verge AI", "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"},
     {"name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
     {"name": "MIT Tech Review", "url": "https://www.technologyreview.com/feed/"},
-    {"name": "VentureBeat AI", "url": "https://venturebeat.com/category/ai/feed/"},
     {"name": "MarkTechPost", "url": "https://www.marktechpost.com/feed/"},
-    {"name": "SyncedReview", "url": "https://syncedreview.com/feed/"},
     {"name": "InfoQ (en)", "url": "https://feed.infoq.com/"},
     {"name": "ZDNet AI", "url": "https://www.zdnet.com/topic/artificial-intelligence/rss.xml"},
     {"name": "Wired AI", "url": "https://www.wired.com/feed/tag/ai/latest/rss"},
     {"name": "The Register AI", "url": "https://www.theregister.com/software/ai_ml/headlines.atom"},
     {"name": "Nature AI", "url": "https://www.nature.com/subjects/computer-science.rss"},
-    {"name": "Science Daily AI", "url": "https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml"},
 
-    # ===== AI 研究者博客 (T1) =====
-    {"name": "Jay Alammar", "url": "https://jalammar.github.io/feed.xml"},
-    {"name": "Chip Huyen Blog", "url": "https://huyenchip.com/feed.xml"},
+    # ===== AI 工具/产品发现 (T2) =====
+    {"name": "Product Hunt", "url": "https://www.producthunt.com/feed"},
 
-    # ===== 电商/商业 (T3) =====
+    # ===== 学术论文（大幅压量：前沿研究只留最相关的少量，热点论文由 HF 论文榜覆盖）=====
     {"name": "Retail Dive", "url": "https://www.retaildive.com/feeds/news/"},
     {"name": "Modern Retail", "url": "https://www.modernretail.co/feed/"},
     {"name": "MarTech", "url": "https://martech.org/feed/"},
 
-    # ===== 学术论文（多子分类，限流）=====
-    {"name": "ArXiv cs.AI", "url": "https://rss.arxiv.org/rss/cs.AI", "limit": 15},
-    {"name": "ArXiv cs.CV", "url": "https://rss.arxiv.org/rss/cs.CV", "limit": 10},
-    {"name": "ArXiv cs.CL", "url": "https://rss.arxiv.org/rss/cs.CL", "limit": 10},
-    {"name": "ArXiv cs.LG", "url": "https://rss.arxiv.org/rss/cs.LG", "limit": 10},
-    {"name": "ArXiv cs.MA", "url": "https://rss.arxiv.org/rss/cs.MA", "limit": 10},
+    # ===== 学术论文（大幅压量：前沿研究只留最相关的少量，热点论文由 HF 论文榜覆盖）=====
+    {"name": "ArXiv cs.AI", "url": "https://rss.arxiv.org/rss/cs.AI", "limit": 8},
+    {"name": "ArXiv cs.CL", "url": "https://rss.arxiv.org/rss/cs.CL", "limit": 5},
+
+    # ===== GitHub 官方 (T1/T2) =====
+    {"name": "GitHub Blog", "url": "https://github.blog/feed/"},
+    {"name": "GitHub Changelog", "url": "https://github.blog/changelog/feed/"},
 
     # ===== KOL 周报 (T1) =====
     {"name": "Import AI", "url": "https://importai.substack.com/feed"},
