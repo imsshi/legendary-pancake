@@ -1,13 +1,17 @@
 """
 微信公众号采集器 — 搜狗网页搜索（requests + BeautifulSoup）
 
-通过搜狗网页搜索（www.sogou.com）检索 AI 相关关键词，提取搜索结果中的微信文章。
-搜狗网页搜索比微信搜索（weixin.sogou.com）反爬更宽松，requests 即可访问。
+采集策略（白名单优先 + 通用关键词兜底）：
+  1. 优质公众号白名单：对每个号搜「公众号名 AI」，召回该号 AI 相关文章
+  2. 通用 AI 关键词兜底：覆盖未在名单内的优质内容
+
+搜狗网页搜索（www.sogou.com）比微信搜索反爬宽松，但频率限制严，间隔需 10-15 秒。
 """
 
 import requests
 import time
 import random
+import re
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 from datetime import datetime
@@ -19,6 +23,16 @@ HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
 
+# ============================================
+# 优质公众号白名单（优先监控，召回其 AI 相关文章）
+# 用户可在此增删
+# ============================================
+QUALITY_ACCOUNTS = [
+    "DataWhale",
+    "AI前线",
+]
+
+# 通用 AI 关键词（兜底，覆盖非白名单优质内容）
 WECHAT_QUERIES = [
     "AI 产品经理",
     "AI 导购",
@@ -33,8 +47,8 @@ WECHAT_QUERIES = [
 ]
 
 SEARCH_TAKE = 5
-SEARCH_DELAY_MIN = 3
-SEARCH_DELAY_MAX = 6
+SEARCH_DELAY_MIN = 10
+SEARCH_DELAY_MAX = 15
 
 
 def _search_sogou_web(query):
@@ -69,6 +83,7 @@ def _search_sogou_web(query):
 
         results.append({
             "title": title,
+            "url": href,
             "summary": summary,
             "source": "微信公众号",
             "date": "",
@@ -92,49 +107,69 @@ def _search_sogou_web(query):
     return cleaned
 
 
+def _collect_one(query, seen_titles, tier, weight, source_prefix):
+    """按单个搜索词采集，返回文章列表"""
+    articles = []
+    try:
+        results = _search_sogou_web(query)
+    except Exception:
+        results = []
+
+    for r in results:
+        title = r["title"]
+        title_key = title[:40]
+        if title_key in seen_titles:
+            continue
+        seen_titles.add(title_key)
+
+        summary = r["summary"]
+        if summary and len(summary) > 10:
+            summary = f"[微信搜索: {query}] {summary[:200]}"
+        else:
+            summary = f"[微信搜索: {query}] {title}"
+
+        article_url = r.get("url", "") or ""
+        if article_url.startswith("/"):
+            article_url = "https://weixin.sogou.com" + article_url
+        if not article_url:
+            article_url = f"wechat://{title[:40]}"
+
+        articles.append({
+            "title": title,
+            "url": article_url,
+            "summary": summary,
+            "published": r.get("date", "") or datetime.now().strftime("%Y-%m-%d"),
+            "source_name": source_prefix,
+            "source_type": "wechat",
+            "credibility_tier": tier,
+            "credibility_weight": weight,
+        })
+
+    time.sleep(random.uniform(SEARCH_DELAY_MIN, SEARCH_DELAY_MAX))
+    return articles
+
+
 def collect_wechat():
-    """搜狗网页搜索通用 AI 主题，提取微信文章，去重后返回"""
-    all_articles = []
+    """白名单公众号优先 + 通用关键词兜底，去重后返回"""
     seen_titles = set()
-
     tier, weight = get_source_credibility("微信公众号")
+    all_articles = []
 
+    # 1. 优先搜优质公众号（召回其 AI 相关文章）
+    print("  📱 [优质公众号] 采集中...", flush=True)
+    for name in QUALITY_ACCOUNTS:
+        articles = _collect_one(f"{name} AI", seen_titles, tier, weight, f"微信: {name}")
+        all_articles.extend(articles)
+    print(f"    ✅ 优质公众号 {len(QUALITY_ACCOUNTS)} 个号已搜")
+
+    # 2. 通用 AI 关键词兜底
+    print("  📱 [通用关键词] 采集中...", flush=True)
     for i, query in enumerate(WECHAT_QUERIES):
-        try:
-            results = _search_sogou_web(query)
-        except Exception:
-            results = []
-
-        for r in results:
-            title = r["title"]
-            title_key = title[:40]
-            if title_key in seen_titles:
-                continue
-            seen_titles.add(title_key)
-
-            summary = r["summary"]
-            if summary and len(summary) > 10:
-                summary = f"[微信搜索: {query}] {summary[:200]}"
-            else:
-                summary = f"[微信搜索: {query}] {title}"
-
-            all_articles.append({
-                "title": title,
-                "url": "",
-                "summary": summary,
-                "published": r.get("date", "") or datetime.now().strftime("%Y-%m-%d"),
-                "source_name": "微信公众号",
-                "source_type": "wechat",
-                "credibility_tier": tier,
-                "credibility_weight": weight,
-            })
-
+        articles = _collect_one(query, seen_titles, tier, weight, "微信公众号")
+        all_articles.extend(articles)
         if (i + 1) % 5 == 0:
-            print(f"    已搜索 {i+1}/{len(WECHAT_QUERIES)} ...", flush=True)
-
-        # 控制频率
-        if i < len(WECHAT_QUERIES) - 1:
-            time.sleep(random.uniform(SEARCH_DELAY_MIN, SEARCH_DELAY_MAX))
+            print(f"    {i+1}/{len(WECHAT_QUERIES)} ...", flush=True)
+    print(f"    ✅ 通用关键词完成")
 
     return all_articles
 

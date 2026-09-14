@@ -86,6 +86,8 @@ SOURCE_CREDIBILITY = {
     "雷锋网": "T3",
     "InfoQ 中文": "T3",
     "爱范儿": "T3",
+    "新智元": "T3",
+    "深燃": "T3",
     "Retail Dive": "T3",
     "Modern Retail": "T3",
     "MarTech": "T3",

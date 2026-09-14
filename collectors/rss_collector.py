@@ -21,6 +21,8 @@ SOURCES = [
     {"name": "雷锋网", "url": "https://www.leiphone.com/feed"},
     {"name": "InfoQ 中文", "url": "https://www.infoq.cn/feed"},
     {"name": "爱范儿", "url": "https://www.ifanr.com/feed"},
+    {"name": "新智元", "url": "https://aiera.com.cn/feed/"},
+    {"name": "深燃", "url": "https://shenran.com/feed/"},
 
     # ===== 海外 AI 官方博客 (T1) =====
     {"name": "OpenAI Blog", "url": "https://openai.com/blog/rss.xml"},
