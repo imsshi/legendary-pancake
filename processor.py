@@ -29,22 +29,27 @@ client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 def normalize_category(cat):
     if not cat:
         return "📌 其他"
-    # 三大类归一化
+    # 三大类归一化。注意：命中顺序必须「特异性从高到低」——
+    # 大类前缀「行业应用的案例 / AI模型技术突破」本身含「行业/应用/模型/技术」
+    # 这些通用词，若先判它们，会把子类目互相吞并（实测：新工程方法全被模型吞走、
+    # 企业提效全被行业吞走）。所以子类目关键词要排在通用词之前。
+    if "非电商" in cat:
+        return "🏭 AI在行业应用的案例 / 其他行业AI应用"
     if "电商" in cat:
         return "🏭 AI在行业应用的案例 / 电商行业AI应用"
-    if "行业" in cat:
-        return "🏭 AI在行业应用的案例 / 其他行业AI应用"
     if "企业" in cat or "提效" in cat:
         return "🏭 AI在行业应用的案例 / 企业AI提效"
-    if "应用" in cat or "落地" in cat:
+    if "行业" in cat or "应用" in cat or "落地" in cat:
         return "🏭 AI在行业应用的案例 / 其他行业AI应用"
     if "洞察" in cat or "KOL" in cat or "观点" in cat:
         return "🎙️ 专家观点与洞察"
-    if "大模型" in cat or "模型" in cat:
-        return "🧠 AI模型技术突破 / 新模型发布"
-    if "工程" in cat or "前沿" in cat or "技术" in cat:
+    # 工程/前沿/工具/产品 必须先于「模型」判断：因为「AI模型技术突破」里也含「模型」，
+    # 若先判「模型」，会把「新工程方法/热门工具」全部误吞成「新模型发布」
+    if "工程" in cat or "前沿" in cat or "工具" in cat or "产品" in cat:
         return "🧠 AI模型技术突破 / 新工程方法"
-    if "工具" in cat or "产品" in cat:
+    if "模型" in cat or "大模型" in cat:
+        return "🧠 AI模型技术突破 / 新模型发布"
+    if "技术" in cat:
         return "🧠 AI模型技术突破 / 新工程方法"
     return "📌 其他"
 
@@ -60,24 +65,32 @@ ARTICLE_PROCESS_PROMPT = """你是 AI 行业情报分析师。读者是互联网
 来源: {source}（可信度: {credibility}）
 领域命中: {domain_hint}
 
-1. 分类（按三大类，子类目可选）：
-   🏭 AI在行业应用的案例：
-     - 电商行业AI应用：竞对平台（淘宝/京东/拼多多/抖音/小红书/Amazon等）的**AI新功能/动作**，必须涉及AI
-     - 其他行业AI应用：零售/金融/教育/医疗等非电商行业的AI落地案例
-     - 企业AI提效：企业内部AI工具、自动化方案、AI赋能
-   🎙️ 专家观点与洞察：AI领域专家对行业方向的判断、产品方法论、趋势分析，须有实质观点
-   🧠 AI模型技术突破：
-     - 新模型发布/重大更新：GPT/Claude/Gemini/DeepSeek等重大发布或突破
-     - 新工程方法/前沿技术：Agent工程、新架构、训练方法、热议AI工具/开源项目
-   📌 其他
+1. 分类（按三大类，子类目可选。先判断是否「应用落地」，再考虑技术）：
+   🏭 AI在行业应用的案例（读者最关心，优先归入此类）：
+     - 电商行业AI应用：电商/导购/营销/客服/选品/推荐/转化等场景的 AI 落地——含淘宝/京东/拼多多/抖音/小红书/Amazon 等平台的 AI 新功能与品牌 AI 营销案例
+     - 其他行业AI应用：零售/金融/教育/医疗等非电商行业的 AI 落地案例
+     - 企业AI提效：企业内部 AI 工具、自动化方案、AI 赋能办公/协作
+     ⚠️ 若「领域命中」为强相关（电商/导购/营销/案例/落地/提效等），优先归入本大类，不要只因为提到「模型」就归技术类
+   🎙️ 专家观点与洞察：AI 领域专家对行业方向的判断、产品方法论、趋势分析，须有实质观点
+   🧠 AI模型技术突破（收窄，只留真·技术）：
+     - 新模型发布/重大更新：仅 GPT/Claude/Gemini/DeepSeek/Qwen/豆包 等旗舰模型的新版本或重磅突破
+     - 新工程方法/前沿技术：Agent 工程、新架构、训练方法等可复现的工程方法（热门 AI 工具/开源项目若更偏「落地/提效」请归入 🏭，纯技术才留这里）
+   📌 其他：以上均不符合
 
-2. 五维评分（各 1-10，拉开差距，不要堆在中间值）：
+2. 五维评分（各 1-10，先定级再给分，禁止堆中间值）：
    - credibility(可信度) / freshness(时新性) / applicability(应用性) / insight(启发性) / relevance(领域相关度)
    relevance 判定标准：对「AI产品经理、电商/导购、评测、应用落地、业务提效」的实际价值。
      纯技术论文/大模型架构细节/纯理论 → relevance=1~3
      有落地案例、产品方法、业务数据、可复用的工具 → relevance=7~10
+   先给文章定级，再按级别打分，overall 分布要接近下面比例（一批约 40 条里）：
+     - 9~10「重磅」约 10%：竞对平台 AI 大动作、旗舰模型发布、关键 KOL 趋势判断
+     - 8「优质」约 18%：有明显落地价值或重要行业更新
+     - 7「良好」约 25%：值得了解
+     - 5~6「一般」约 30%：可看可不看
+     - 3~4「低质/跑题」约 17%：纯理论、纯转发、与业务无关
+   ⚠️ 严禁过半集中在 5~6 分；9~10 分必须给足约 10%，不能整批只给 1~2 条 9 分。
    combined = round(credibility×0.20 + freshness×0.10 + applicability×0.30 + insight×0.20 + relevance×0.20)
-   分布约束：9~10 分的只给极少数最重磅内容（约 10% 以内），4 分以下给明显低质内容，不要让大量内容堆在同一分值。
+   五维分数要与 overall 级别自洽：定了「重磅」各维就给 8~10，定了「低质」就给 1~4。
 
 3. 「核心特点」：模型类标注核心特点（如"支持视频理解"）；工具类标注核心功能（如"AI生成PPT"）；更新类标注新增了什么（如"新增Agent模式"）。20字以内。不适用写"无"。
 
@@ -90,7 +103,7 @@ ARTICLE_PROCESS_PROMPT = """你是 AI 行业情报分析师。读者是互联网
 7. 关键词 1-3 个，相关工具/项目名（空数组如无）
 
 JSON:
-{{"title_cn":"","category":"🧠 大模型动态（发布/更新/评测）","scores":{{"credibility":7,"freshness":6,"applicability":8,"insight":7,"relevance":8}},"overall_score":7,"core_feature":"核心特点或新功能","one_liner":"大白话","explain_simple":"通俗解读","application":"应用启示","keywords":[],"related_tools":[]}}
+{{"title_cn":"","category":"🏭 AI在行业应用的案例 / 电商行业AI应用","scores":{{"credibility":7,"freshness":6,"applicability":8,"insight":7,"relevance":8}},"overall_score":7,"core_feature":"核心特点或新功能","one_liner":"大白话","explain_simple":"通俗解读","application":"应用启示","keywords":[],"related_tools":[]}}
 
 低质内容：overall_score≤3，explain_simple 写"低质内容"。"""
 
@@ -126,7 +139,7 @@ REPORT_PROMPT = """你是 AI 行业周报编辑。读者是互联网公司业务
 JSON:
 {{
   "top_picks": [{{"title":"","explain_simple":"","application":"","url":"","source":""}}],
-  "sections": [{{"category":"🧠 大模型动态（发布/更新/评测）","items":[{{"title":"","explain_simple":"","application":"","url":"","source":""}}]}}],
+  "sections": [{{"category":"🏭 AI在行业应用的案例","items":[{{"title":"","explain_simple":"","application":"","url":"","source":""}}]}}],
   "application_insights": [{{"insight":"","why":""}}],
   "recommended_tools": [{{"name":"","description":"","url":""}}],
   "stats": {{}}
