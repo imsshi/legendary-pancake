@@ -61,7 +61,7 @@ git push origin main
 
 在 GitHub 仓库：**Settings → Secrets → Actions → New secret**，添加 `DEEPSEEK_API_KEY`、`FEISHU_WEBHOOK`。
 
-Bot 会在**每周一早上 9:00（北京时间）**自动运行。也可在 Actions 页面手动触发。
+Bot 会在**每周一早上 10:00（北京时间）**自动运行。也可在 Actions 页面手动触发。
 
 ---
 

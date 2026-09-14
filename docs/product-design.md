@@ -172,7 +172,7 @@ combined = credibility×0.20 + freshness×0.10
 ## 7. 技术架构
 
 ```
-GitHub Actions (每周三 9:00 北京时间)
+GitHub Actions (每周一 10:00 北京时间)
   └─ python main.py
        ├─ 采集层 collectors/
        │    ├─ trending_collector  (榜单，第0步)
@@ -213,7 +213,7 @@ GitHub Actions (每周三 9:00 北京时间)
 | 前沿研究 vs 应用落地 | 前沿压缩到 2-3 条 | 用户核心是 PM，不是研究者 |
 | 全量 vs 榜单 | 榜单优先 + RSS 补广度 | 榜单信号密度高，RSS 兜底 |
 | 中文 vs 英文 | 双语并行 | 中文热榜 + 英文前沿 |
-| 定时 vs 实时 | 每周三定时 | 周报形态，非快讯 |
+| 定时 vs 实时 | 每周一 10:00 定时 | 周报形态，非快讯 |
 
 ---
 
